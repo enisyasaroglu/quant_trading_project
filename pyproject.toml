@@ -1,0 +1,17 @@
+[project]
+name = "qmind-quant-platform"
+version = "0.1.0"
+description = "A quantitative finance platform."
+authors = [
+    {name = "enis_yasaroglu",email = "enis_yasaroglu@hotmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.10, <4.0"
+
+[tool.poetry]
+packages = [{include = "qmind_quant"}] # Corrected to your main package folder
+[tool.poetry.dependencies]
+pandas = "^2.3.2"
+pyarrow = "^21.0.0"
+alpaca-py = "^0.42.0"
+requests = "^2.32.5"
