@@ -1,0 +1,32 @@
+# docker-compose.yml
+services:
+  # The Redis cache service
+  redis:
+    image: "redis:alpine"
+    container_name: qmind-redis
+    ports:
+      - "6379:6379"
+
+  # The main trading engine service
+  trading-engine:
+    build: .
+    container_name: qmind-trading-engine
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    command: python scripts/run_live_trading.py
+    depends_on:
+      - redis
+
+  # The Streamlit dashboard service
+  dashboard:
+    build: .
+    container_name: qmind-dashboard
+    volumes:
+      - .:/app
+    ports:
+      - "8501:8501"
+    command: streamlit run dashboard.py
+    depends_on:
+      - redis

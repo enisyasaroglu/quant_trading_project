@@ -24,3 +24,9 @@ numpy = "<2.0"
 scikit-learn = "^1.7.1"
 joblib = "^1.5.1"
 optuna = "^4.5.0"
+redis = "^6.4.0"
+xgboost = "^3.0.4"
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.4.1"
+
