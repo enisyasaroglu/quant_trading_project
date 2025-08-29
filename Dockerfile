@@ -17,10 +17,9 @@ ENV PATH="/app/.venv/bin:$PATH"
 COPY . .
 
 # --- THIS IS THE FIX ---
-# Copy the new start-up script into the container
-COPY start.sh .
-# Make the new start-up script executable
-RUN chmod +x ./start.sh
+# Expose the port that Streamlit will run on
+EXPOSE 8501
 
 # Set the command to run when the container starts.
-CMD ["./start.sh"]
+# This is the most reliable way to define the start command.
+CMD ["streamlit", "run", "dashboard.py", "--server.port=8501", "--server.address=0.0.0.0"]
