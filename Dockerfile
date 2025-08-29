@@ -30,3 +30,6 @@ ENV PATH="/app/.venv/bin:$PATH"
 
 # Copy the entire project's source code
 COPY . .
+
+# Make the new start-up script executable
+RUN chmod +x ./start.sh
