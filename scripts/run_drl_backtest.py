@@ -1,19 +1,27 @@
+# scripts/run_drl_backtest.py
+
 import os
 import quantstats as qs
 from stable_baselines3 import PPO
+
 from qmind_quant.core.event_manager import EventManager
 from qmind_quant.data_management.data_handler import HistoricalDataHandler
 from qmind_quant.simulation.backtest_engine import BacktestEngine
 from qmind_quant.strategies.library.rl_strategy import RLStrategy
 from qmind_quant.portfolio_management.portfolio import Portfolio
 from qmind_quant.execution.execution import SimulatedExecutionHandler
-from qmind_quant.config.paths import FEATURES_DATA_DIR, MODELS_DIR, REPORTS_DIR
+from qmind_quant.config.paths import DATA_DIR, MODELS_DIR, REPORTS_DIR  # Use DATA_DIR
 
 
 def main():
-    data_file = FEATURES_DATA_DIR / "ml_feature_data.parquet"
-    model_name = "drl_ppo_v1.zip"
-    model_file = MODELS_DIR / model_name
+    """
+    Main function to configure and run a backtest for the DRL strategy.
+    """
+    # --- THIS IS THE FIX ---
+    # The strategy now needs the raw data, not the pre-calculated feature data.
+    data_file = DATA_DIR / "processed" / "us_equities_daily.parquet"
+    model_file = MODELS_DIR / "drl_ppo_v1.zip"
+
     tickers = ["AAPL"]
     initial_capital = 100000.0
 
@@ -31,9 +39,11 @@ def main():
 
     print("Generating performance report...")
     equity_curve = portfolio.get_equity_curve()
+
     os.makedirs(REPORTS_DIR, exist_ok=True)
-    report_name = model_name.replace(".zip", "_report.html")
+    report_name = "drl_ppo_strategy_report.html"
     output_path = REPORTS_DIR / report_name
+
     qs.reports.html(
         equity_curve["returns"], output=str(output_path), title="DRL PPO Strategy"
     )
