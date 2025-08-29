@@ -1,34 +1,44 @@
-[project]
+[tool.poetry]
 name = "qmind-quant-platform"
 version = "0.1.0"
 description = "A quantitative finance platform."
-authors = [
-    {name = "enis_yasaroglu",email = "enis_yasaroglu@hotmail.com"}
-]
+authors = ["enis_yasaroglu <enis_yasaroglu@hotmail.com>"]
 readme = "README.md"
-requires-python = ">=3.10, <4.0"
+packages = [{include = "qmind_quant"}]
 
-[tool.poetry]
-packages = [{include = "qmind_quant"}] # Corrected to your main package folder
 [tool.poetry.dependencies]
-pandas = "^2.3.2"
-pyarrow = "^21.0.0"
-alpaca-py = "^0.42.0"
-requests = "^2.32.5"
-python-dotenv = "^1.1.1"
-yfinance = "^0.2.65"
-quantstats = "^0.0.76"
-matplotlib = "^3.10.5"
-pandas-ta = "^0.3.14b0"
+python = ">=3.10,<3.14"
+pandas = "^2.2.2"
 numpy = "<2.0"
-scikit-learn = "^1.7.1"
-joblib = "^1.5.1"
-optuna = "^4.5.0"
-redis = "^6.4.0"
-xgboost = "^3.0.4"
-gymnasium = "^1.2.0"
-stable-baselines3 = {extras = ["extra"], version = "^2.7.0"}
+pyarrow = "^17.0.0"
+
+# Data, ML, and Quant libraries (for core application)
+yfinance = "^0.2.40"
+scikit-learn = "^1.5.1"
+joblib = "^1.4.2"
+xgboost = "^2.1.0"
+quantstats = "^0.0.66"
+matplotlib = "^3.9.1"
+optuna = "^3.6.1"
+
+# API, Networking, and UI libraries
+alpaca-py = "^0.21.0"
+requests = "^2.32.3"
+python-dotenv = "^1.0.1"
+redis = "^5.0.7"
+streamlit = "^1.39.0"
 
 [tool.poetry.group.dev.dependencies]
+# Development and testing libraries
 pytest = "^8.4.1"
 
+[tool.poetry.group.drl]
+# Optional group for heavy Deep Reinforcement Learning dependencies
+# These will not be installed in the production build.
+optional = true
+dependencies = {gymnasium = "^1.2.0", stable-baselines3 = {extras = ["extra"], version = "^2.7.0"}}
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
