@@ -2,86 +2,96 @@
 
 import joblib
 import pandas as pd
-import pandas_ta as ta
 from collections import deque
 from qmind_quant.strategies.base_strategy import BaseStrategy
 from qmind_quant.core.event_types import MarketEvent, SignalEvent
+from qmind_quant.analytics.technical_indicators import (
+    calculate_ema,
+    calculate_macd,
+    calculate_adx,
+    calculate_rsi,
+    calculate_stochastic_oscillator,
+    calculate_bollinger_bands,
+    calculate_atr,
+    calculate_obv,
+    calculate_vwap,
+)
 
 
 class MLStrategy(BaseStrategy):
     """
-    A strategy that uses a pre-trained machine learning model to generate signals.
+    A strategy that uses a pre-trained supervised learning model to generate signals.
     """
 
     def __init__(
-        self, tickers: list[str], event_manager, model_path: str, data_window=30
+        self,
+        tickers: list[str],
+        event_manager,
+        model_path: str = None,
+        model=None,
+        data_window=50,
     ):
         super().__init__(tickers, event_manager)
-        self.model = joblib.load(model_path)
+        if model_path is None and model is None:
+            raise ValueError("Either 'model_path' or 'model' must be provided.")
+
+        self.model = model if model is not None else joblib.load(model_path)
         self.data_window = data_window
+        self.bars = {ticker: deque(maxlen=self.data_window) for ticker in self.tickers}
+        self.invested = dict.fromkeys(self.tickers, "NONE")
 
-        # Store recent close prices to calculate features
-        self.prices = {
-            ticker: deque(maxlen=self.data_window) for ticker in self.tickers
-        }
-        self.invested = {ticker: "NONE" for ticker in self.tickers}
-
+    # ... The rest of the methods (_calculate_features, on_market_event) remain unchanged ...
     def _calculate_features(self, ticker: str) -> pd.DataFrame | None:
-        """
-        Calculates the features for a single ticker based on the current price deque.
-        """
-        # Create a DataFrame from the deque of prices
-        price_series = pd.Series(list(self.prices[ticker]), name="close")
-        if len(price_series) < self.data_window:
+        if len(self.bars[ticker]) < self.data_window:
             return None
+        df = pd.DataFrame(list(self.bars[ticker]))
+        df["ema_12"] = calculate_ema(df["close"], window=12)
+        df["ema_26"] = calculate_ema(df["close"], window=26)
+        macd_df = calculate_macd(df["close"])
+        df["macd"] = macd_df["macd"]
+        df["adx_14"] = calculate_adx(df["high"], df["low"], df["close"], window=14)
+        df["rsi_14"] = calculate_rsi(df["close"], window=14)
+        df["stoch_k_14"] = calculate_stochastic_oscillator(
+            df["high"], df["low"], df["close"], window=14
+        )
+        bbands_df = calculate_bollinger_bands(df["close"], window=20)
+        df["bb_width"] = (bbands_df["bb_upper"] - bbands_df["bb_lower"]) / bbands_df[
+            "bb_middle"
+        ]
+        df["atr_14"] = calculate_atr(df["high"], df["low"], df["close"], window=14)
+        df["obv"] = calculate_obv(df["close"], df["volume"])
+        df["vwap"] = calculate_vwap(df["close"], df["volume"])
 
-        # --- Recreate the *exact same* features used in training ---
-        features = pd.DataFrame(index=[price_series.index[-1]])
-
-        returns_1d = price_series.pct_change(1)
-        features["returns_1d"] = returns_1d.iloc[-1]
-        features["returns_5d"] = price_series.pct_change(5).iloc[-1]
-        features["returns_21d"] = price_series.pct_change(21).iloc[-1]
-        features["volatility_21d"] = returns_1d.rolling(window=21).std().iloc[-1]
-        features["rsi_14d"] = ta.rsi(price_series, length=14).iloc[-1]
-
-        # Drop any potential NaN values from the single row
-        features.dropna(inplace=True)
-        if features.empty:
-            return None
-
-        return features
+        latest_features = df.tail(1)
+        feature_names = [
+            "ema_12",
+            "ema_26",
+            "macd",
+            "adx_14",
+            "rsi_14",
+            "stoch_k_14",
+            "bb_width",
+            "atr_14",
+            "obv",
+            "vwap",
+        ]
+        return latest_features[feature_names]
 
     def on_market_event(self, event: MarketEvent):
-        """
-        On a new market event, calculate features and generate a signal if the model predicts one.
-        """
         if event.ticker not in self.tickers:
             return
-
-        self.prices[event.ticker].append(event.close)
-
-        # Wait until we have enough data to calculate all features
-        if len(self.prices[event.ticker]) < self.data_window:
-            return
-
-        # Calculate features for the current bar
+        self.bars[event.ticker].append(event)
         features = self._calculate_features(event.ticker)
-        if features is None:
+        if features is None or features.isnull().values.any():
             return
 
-        # Make a prediction (model expects a 2D array)
         prediction = self.model.predict(features)[0]
-
         ticker = event.ticker
         if prediction == 1 and self.invested[ticker] != "LONG":
             signal = SignalEvent(event.timestamp, ticker, "LONG")
             self.event_manager.put(signal)
             self.invested[ticker] = "LONG"
         elif prediction == 0 and self.invested[ticker] == "LONG":
-            # If the model predicts down, we exit our long position
-            signal = SignalEvent(
-                event.timestamp, ticker, "SHORT"
-            )  # 'SHORT' signal is used to exit
+            signal = SignalEvent(event.timestamp, ticker, "SHORT")
             self.event_manager.put(signal)
             self.invested[ticker] = "NONE"

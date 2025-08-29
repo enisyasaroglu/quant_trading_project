@@ -1,17 +1,31 @@
 # qmind_quant/data_management/feature_engineer.py
 
 import pandas as pd
-import pandas_ta as ta
+
+# Import all the custom indicator functions from your new module
+from qmind_quant.analytics.technical_indicators import (
+    calculate_sma,
+    calculate_ema,
+    calculate_macd,
+    calculate_adx,
+    calculate_rsi,
+    calculate_stochastic_oscillator,
+    calculate_bollinger_bands,
+    calculate_atr,
+    calculate_obv,
+    calculate_vwap,
+)
 
 
 class FeatureEngineer:
     """
-    A class to engineer features for a given OHLCV dataset.
+    A class to engineer a rich set of features for a given OHLCV dataset
+    using a custom-built technical indicator library.
     """
 
     def create_features(self, df: pd.DataFrame, ticker_col="ticker") -> pd.DataFrame:
         """
-        Adds features and the target variable to the OHLCV data.
+        Adds a curated set of features and the target variable to the OHLCV data.
 
         Args:
             df (pd.DataFrame): DataFrame with multi-ticker OHLCV data.
@@ -20,30 +34,44 @@ class FeatureEngineer:
         Returns:
             pd.DataFrame: The DataFrame with added features and target.
         """
-        # To calculate features correctly for each stock, we group by the ticker.
-        # We'll store the results for each ticker in a list and concatenate at the end.
         all_features = []
 
+        # Process each stock's data individually to prevent look-ahead bias
         for ticker, group in df.groupby(ticker_col):
-            # --- Feature Creation ---
+            # Ensure the group is a DataFrame
+            group = group.copy()
 
-            # 1. Momentum Features (Returns over different periods)
-            group["returns_1d"] = group["close"].pct_change(1)
-            group["returns_5d"] = group["close"].pct_change(5)
-            group["returns_21d"] = group["close"].pct_change(
-                21
-            )  # Approx. 1 trading month
+            # --- A. Trend Indicators ---
+            group["ema_12"] = calculate_ema(group["close"], window=12)
+            group["ema_26"] = calculate_ema(group["close"], window=26)
+            macd_df = calculate_macd(group["close"])
+            group["macd"] = macd_df["macd"]
+            group["adx_14"] = calculate_adx(
+                group["high"], group["low"], group["close"], window=14
+            )
 
-            # 2. Volatility Feature (Rolling standard deviation of returns)
-            group["volatility_21d"] = group["returns_1d"].rolling(window=21).std()
+            # --- B. Momentum Indicators ---
+            group["rsi_14"] = calculate_rsi(group["close"], window=14)
+            group["stoch_k_14"] = calculate_stochastic_oscillator(
+                group["high"], group["low"], group["close"], window=14
+            )
 
-            # 3. Technical Indicator (RSI - Relative Strength Index)
-            group["rsi_14d"] = ta.rsi(group["close"], length=14)
+            # --- C. Volatility Indicators ---
+            bbands_df = calculate_bollinger_bands(group["close"], window=20)
+            group["bb_width"] = (
+                bbands_df["bb_upper"] - bbands_df["bb_lower"]
+            ) / bbands_df["bb_middle"]
+            group["atr_14"] = calculate_atr(
+                group["high"], group["low"], group["close"], window=14
+            )
+
+            # --- D. Volume Indicators ---
+            group["obv"] = calculate_obv(group["close"], group["volume"])
+            group["vwap"] = calculate_vwap(group["close"], group["volume"])
 
             # --- Target Variable Creation ---
-            # We want to predict if the price will go up or down in the next 5 days.
-            # 1 = Price went up, 0 = Price went down or stayed the same.
-            future_returns = group["close"].shift(-5).pct_change(5)
+            # Predict if the price will be higher in 5 days (1 for up, 0 for down/same)
+            future_returns = group["close"].shift(-5).pct_change(5, fill_method=None)
             group["target"] = (future_returns > 0).astype(int)
 
             all_features.append(group)
