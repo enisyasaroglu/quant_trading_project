@@ -5,8 +5,6 @@ import pandas as pd
 from collections import deque
 from qmind_quant.strategies.base_strategy import BaseStrategy
 from qmind_quant.core.event_types import MarketEvent, SignalEvent
-
-# Import our own custom indicator functions
 from qmind_quant.analytics.technical_indicators import (
     calculate_ema,
     calculate_macd,
@@ -21,19 +19,32 @@ from qmind_quant.analytics.technical_indicators import (
 
 
 class MLStrategy(BaseStrategy):
-    def __init__(self, tickers: list[str], event_manager, model, data_window=50):
+    """
+    A strategy that uses a pre-trained supervised learning model to generate signals.
+    """
+
+    def __init__(
+        self,
+        tickers: list[str],
+        event_manager,
+        model_path: str = None,
+        model=None,
+        data_window=50,
+    ):
         super().__init__(tickers, event_manager)
-        self.model = model
+        if model_path is None and model is None:
+            raise ValueError("Either 'model_path' or 'model' must be provided.")
+
+        self.model = model if model is not None else joblib.load(model_path)
         self.data_window = data_window
         self.bars = {ticker: deque(maxlen=self.data_window) for ticker in self.tickers}
         self.invested = dict.fromkeys(self.tickers, "NONE")
 
+    # ... The rest of the methods (_calculate_features, on_market_event) remain unchanged ...
     def _calculate_features(self, ticker: str) -> pd.DataFrame | None:
         if len(self.bars[ticker]) < self.data_window:
             return None
         df = pd.DataFrame(list(self.bars[ticker]))
-
-        # Calculate all features the model was trained on
         df["ema_12"] = calculate_ema(df["close"], window=12)
         df["ema_26"] = calculate_ema(df["close"], window=26)
         macd_df = calculate_macd(df["close"])
