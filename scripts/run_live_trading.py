@@ -1,6 +1,5 @@
 # scripts/run_live_trading.py
 
-import os
 import time
 import threading
 from dotenv import load_dotenv
